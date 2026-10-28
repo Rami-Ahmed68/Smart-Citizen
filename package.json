@@ -1,0 +1,46 @@
+{
+  "name": "smartcitizen",
+  "version": "1.0.0",
+  "description": "Smart citizen registry with AI-powered visual identity verification using Gemini API",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "citizen",
+    "registry",
+    "ai",
+    "gemini",
+    "vision",
+    "identity-verification"
+  ],
+  "author": "Rami Ahmed",
+  "license": "ISC",
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.13",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
+    "@vladmandic/human": "^3.3.6",
+    "bcrypt": "^6.0.0",
+    "canvas": "^3.2.3",
+    "cohere-ai": "^8.3.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "joi": "^18.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "lodash": "^4.18.1",
+    "mongoose": "^9.11.4",
+    "multer": "^2.5.0",
+    "sharp": "^0.35.5",
+    "shinobi-face-api": "^2.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
