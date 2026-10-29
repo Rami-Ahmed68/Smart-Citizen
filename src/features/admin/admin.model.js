@@ -54,6 +54,7 @@ const adminSchema = new mongoose.Schema(
       type: String,
       required: [true, "Password is required"],
       minlength: 8,
+      select: false,
     },
 
     role: {
@@ -65,6 +66,12 @@ const adminSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       required: [true, "Sorry, Status is required"],
+    },
+
+    permissions: {
+      type: [String],
+      enum: ["read", "create", "update", "delete"],
+      default: ["read"],
     },
   },
   {

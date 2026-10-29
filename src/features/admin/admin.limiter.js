@@ -52,21 +52,6 @@ export const adminReadLimiter = rateLimit({
   ),
 });
 
-export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    const email = req.body?.email?.toLowerCase().trim() || "unknown";
-    return `${ipKeyGenerator(req.ip)}:${email}`;
-  },
-  handler: buildHandler(
-    "Too many login attempts. Please try again in 15 minutes.",
-    "عدد كبير من محاولات تسجيل الدخول. يرجى المحاولة بعد 15 دقيقة.",
-  ),
-});
-
 export const getAllLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,

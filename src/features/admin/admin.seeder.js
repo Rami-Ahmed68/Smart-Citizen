@@ -47,6 +47,7 @@ export async function seedSuperAdmin() {
       avatar,
       role: "super",
       isActive: true,
+      permissions: ["read", "create", "update", "delete"],
     });
 
     console.log(`✅ Superadmin created: ${superAdmin.email}`);

@@ -2,7 +2,6 @@ import { Router } from "express";
 import { validate } from "../../utils/validation/validate.middleware.js";
 import {
   CreateAdmin,
-  LogIn,
   GetAll,
   GetOne,
   ToggleStatus,
@@ -14,7 +13,6 @@ import {
 } from "./admin.controller.js";
 import {
   CreateAdminValidation,
-  LogInValidation,
   AdminQueryValidation,
   ToggleStatusValidation,
   GetOneValidation,
@@ -25,7 +23,6 @@ import {
   UpdateMyDataValidation,
 } from "./admin.validation.js";
 import {
-  loginLimiter,
   createAdminLimiter,
   getAllLimiter,
   getOneLimiter,
@@ -36,11 +33,9 @@ import {
   updateAdminDataLimiter,
   updateMyDataLimiter,
 } from "./admin.limiter.js";
-import { protect } from "../../middleware/auth/auth.middleware.js";
+import { protect } from "../../middleware/protect/protect.js";
 
 const AdminRouter = Router();
-
-AdminRouter.post("/log-in", loginLimiter, validate(LogInValidation), LogIn);
 
 AdminRouter.post(
   "/create",
@@ -61,7 +56,7 @@ AdminRouter.get(
 AdminRouter.get(
   "/one",
   getOneLimiter,
-  protect("super"),
+  protect("super", "admin"),
   validate(GetOneValidation, "query"),
   GetOne,
 );

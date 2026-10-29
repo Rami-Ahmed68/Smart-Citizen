@@ -2,20 +2,28 @@ import jwt from "jsonwebtoken";
 import { ApiError } from "../../utils/error/ApiError.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const ACCESS_TOKEN_LIFE = `${process.env.ACCESS_TOKEN_LIFE}m`;
+const REFRESH_TOKEN_LIFE = `${process.env.REFRESH_TOKEN_LIFE}d`;
 
 if (!JWT_SECRET) {
   throw new Error(
-    "❌ JWT_SECRET is not defined. Add it to .env before starting the server.",
+    "JWT_SECRET is not defined. Add it to .env before starting the server.",
   );
 }
 
 if (JWT_SECRET.length < 32) {
   throw new Error(
-    "❌ JWT_SECRET must be at least 32 characters long for security.",
+    "JWT_SECRET must be at least 32 characters long for security.",
   );
 }
 
-export function generateToken(payload) {
+if (!process.env.ACCESS_TOKEN_LIFE || !process.env.REFRESH_TOKEN_LIFE) {
+  throw new Error(
+    "Sorry, Can not find a ACCESS_TOKEN_LIFE and REFRESH_TOKEN_LIFE must be defined.",
+  );
+}
+
+export function generateToken(payload, type = "access") {
   if (!payload || typeof payload !== "object") {
     throw new ApiError(
       { en: "Invalid token payload", ar: "بيانات التوكن غير صالحة" },
@@ -23,8 +31,13 @@ export function generateToken(payload) {
     );
   }
 
+  const expiresIn = type === "refresh" ? REFRESH_TOKEN_LIFE : ACCESS_TOKEN_LIFE;
+
   try {
-    return jwt.sign(payload, JWT_SECRET);
+    return jwt.sign(payload, JWT_SECRET, {
+      expiresIn,
+      algorithm: "HS256",
+    });
   } catch (err) {
     throw new ApiError(
       {
@@ -38,7 +51,9 @@ export function generateToken(payload) {
 
 export function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET, {
+      algorithms: ["HS256"],
+    });
   } catch (err) {
     if (err.name === "TokenExpiredError") {
       throw new ApiError(
