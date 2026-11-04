@@ -100,7 +100,7 @@ export const GetAll = async (req, res, next) => {
         .sort(sort)
         .skip(skip)
         .limit(limit)
-        .select("-password")
+
         .lean(),
       Admin.countDocuments(filter),
     ]);
@@ -134,7 +134,22 @@ export const GetOne = async (req, res, next) => {
   try {
     const { target_id } = req.validated;
 
-    const admin = await Admin.findById(target_id).select("-password").lean();
+    const isSelf = target_id === req.admin._id.toString();
+    const isSuper = req.admin.role === "super";
+
+    if (!isSelf && !isSuper) {
+      return next(
+        new ApiError(
+          {
+            en: "You can only view your own account.",
+            ar: "يمكنك عرض حسابك الخاص فقط.",
+          },
+          403,
+        ),
+      );
+    }
+
+    const admin = await Admin.findById(target_id).lean();
 
     if (!admin) {
       return next(
@@ -147,8 +162,6 @@ export const GetOne = async (req, res, next) => {
         ),
       );
     }
-
-    console.log(admin);
 
     return res.status(200).json({
       success: true,

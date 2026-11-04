@@ -1,14 +1,5 @@
 import Joi from "joi";
-import mongoose from "mongoose";
-
-const objectIdSchema = Joi.string().custom((value, helpers) => {
-  if (!mongoose.Types.ObjectId.isValid(value)) {
-    return helpers.error("any.invalid", {
-      message: "Invalid ID format splithere معرف غير صالح",
-    });
-  }
-  return value;
-}, "ObjectId Validation");
+import { objectIdSchema } from "../../utils/id/id.validations.js";
 
 export const CreateAdminValidation = Joi.object({
   first_name: Joi.string().trim().min(2).max(50).required().messages({
@@ -116,7 +107,7 @@ export const CreateAdminValidation = Joi.object({
         "Avatar URL must not exceed 500 characters splithere رابط الصورة يجب ألا يتجاوز 500 حرف",
       "any.required": "Avatar is required splithere الصورة مطلوبة",
     }),
-});
+}).strict();
 
 export const ChangePasswordValidation = Joi.object({
   admin_id: objectIdSchema.required().messages({
@@ -159,7 +150,7 @@ export const ChangePasswordValidation = Joi.object({
     "any.required":
       "Your password is required for confirmation splithere كلمة مرورك مطلوبة للتأكيد",
   }),
-});
+}).strict();
 
 export const UpdateAdminValidation = Joi.object({
   first_name: Joi.string().trim().min(2).max(50).optional().messages({
@@ -228,7 +219,8 @@ export const UpdateAdminValidation = Joi.object({
   .messages({
     "object.min":
       "At least one field must be provided to update splithere يجب توفير حقل واحد على الأقل للتحديث",
-  });
+  })
+  .strict();
 
 export const AdminIdValidation = Joi.object({
   id: objectIdSchema.required().messages({
@@ -238,7 +230,7 @@ export const AdminIdValidation = Joi.object({
     "string.base":
       "Admin ID must be a string splithere معرف الأدمن يجب أن يكون نصًا",
   }),
-});
+}).strict();
 
 export const AdminQueryValidation = Joi.object({
   page: Joi.number()
@@ -278,10 +270,10 @@ export const AdminQueryValidation = Joi.object({
       "Search must not exceed 50 characters splithere البحث يجب ألا يتجاوز 50 حرفًا",
   }),
 
-  role: Joi.string().valid("admin", "superadmin").optional().messages({
+  role: Joi.string().valid("admin", "super").optional().messages({
     "string.base": "Role must be text splithere الدور يجب أن يكون نصًا",
     "any.only":
-      "Role must be 'admin' or 'superadmin' splithere الدور يجب أن يكون 'admin' أو 'superadmin'",
+      "Role must be 'admin' or 'super' splithere الدور يجب أن يكون 'admin' أو 'super'",
   }),
 
   isActive: Joi.boolean().optional().messages({
@@ -306,7 +298,7 @@ export const AdminQueryValidation = Joi.object({
       "any.only":
         "Sort order must be 'asc' or 'desc' splithere اتجاه الترتيب يجب أن يكون 'asc' أو 'desc'",
     }),
-});
+}).strict();
 
 export const GetOneValidation = Joi.object({
   target_id: objectIdSchema.required().messages({
@@ -317,7 +309,7 @@ export const GetOneValidation = Joi.object({
     "string.base":
       "Target admin ID must be a string splithere معرف الأدمن المستهدف يجب أن يكون نصًا",
   }),
-});
+}).strict();
 
 export const ToggleStatusValidation = Joi.object({
   target_id: objectIdSchema.required().messages({
@@ -328,7 +320,7 @@ export const ToggleStatusValidation = Joi.object({
     "string.base":
       "Target admin ID must be a string splithere معرف الأدمن المستهدف يجب أن يكون نصًا",
   }),
-});
+}).strict();
 
 export const DeleteValidation = Joi.object({
   target_id: objectIdSchema.required().messages({
@@ -339,7 +331,7 @@ export const DeleteValidation = Joi.object({
     "string.base":
       "Target admin ID must be a string splithere معرف الأدمن المستهدف يجب أن يكون نصًا",
   }),
-});
+}).strict();
 
 export const ChangeAdminPasswordValidation = Joi.object({
   target_id: objectIdSchema.required().messages({
@@ -382,7 +374,7 @@ export const ChangeAdminPasswordValidation = Joi.object({
     "any.required":
       "Your password is required for confirmation splithere كلمة مرورك مطلوبة للتأكيد",
   }),
-});
+}).strict();
 
 export const ChangeMyPasswordValidation = Joi.object({
   current_password: Joi.string().min(1).max(128).required().messages({
@@ -428,7 +420,7 @@ export const ChangeMyPasswordValidation = Joi.object({
       "any.required":
         "Password confirmation is required splithere تأكيد كلمة المرور مطلوب",
     }),
-});
+}).strict();
 
 export const UpdateAdminDataValidation = Joi.object({
   target_id: objectIdSchema.required().messages({
@@ -488,7 +480,8 @@ export const UpdateAdminDataValidation = Joi.object({
   .messages({
     "object.min":
       "At least one field (besides target_id) must be provided splithere يجب توفير حقل واحد على الأقل (بجانب target_id)",
-  });
+  })
+  .strict();
 
 export const UpdateMyDataValidation = Joi.object({
   first_name: Joi.string().trim().min(2).max(50).optional().messages({
@@ -533,7 +526,8 @@ export const UpdateMyDataValidation = Joi.object({
   .messages({
     "object.min":
       "At least one field must be provided to update splithere يجب توفير حقل واحد على الأقل للتحديث",
-  });
+  })
+  .strict();
 
 export default {
   CreateAdminValidation,

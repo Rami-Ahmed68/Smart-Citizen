@@ -61,6 +61,8 @@ export const LogIn = async (req, res, next) => {
       );
     }
 
+    console.log(exists_account.permissions);
+
     const payload = {
       _id: exists_account._id,
       role: exists_account.role,
