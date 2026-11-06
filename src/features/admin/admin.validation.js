@@ -92,22 +92,7 @@ export const CreateAdminValidation = Joi.object({
       "Birth date must be in the past splithere تاريخ الميلاد يجب أن يكون في الماضي",
     "any.required": "Birth date is required splithere تاريخ الميلاد مطلوب",
   }),
-
-  avatar: Joi.string()
-    .trim()
-    .uri({ scheme: ["http", "https"] })
-    .max(500)
-    .required()
-    .messages({
-      "string.base": "Avatar must be text splithere الصورة يجب أن تكون نصًا",
-      "string.empty": "Avatar is required splithere الصورة مطلوبة",
-      "string.uri":
-        "Avatar must be a valid URL splithere الصورة يجب أن تكون رابطًا صالحًا",
-      "string.max":
-        "Avatar URL must not exceed 500 characters splithere رابط الصورة يجب ألا يتجاوز 500 حرف",
-      "any.required": "Avatar is required splithere الصورة مطلوبة",
-    }),
-}).strict();
+});
 
 export const ChangePasswordValidation = Joi.object({
   admin_id: objectIdSchema.required().messages({
@@ -233,72 +218,14 @@ export const AdminIdValidation = Joi.object({
 }).strict();
 
 export const AdminQueryValidation = Joi.object({
-  page: Joi.number()
-    .integer()
-    .min(1)
-    .max(10000)
-    .default(1)
-    .optional()
-    .messages({
-      "number.base": "Page must be a number splithere الصفحة يجب أن تكون رقمًا",
-      "number.integer":
-        "Page must be an integer splithere الصفحة يجب أن تكون عددًا صحيحًا",
-      "number.min":
-        "Page must be at least 1 splithere الصفحة يجب أن تكون 1 على الأقل",
-      "number.max": "Page is too large splithere الصفحة كبيرة جدًا",
-    }),
-
-  limit: Joi.number()
-    .integer()
-    .min(1)
-    .max(100)
-    .default(20)
-    .optional()
-    .messages({
-      "number.base": "Limit must be a number splithere الحد يجب أن يكون رقمًا",
-      "number.integer":
-        "Limit must be an integer splithere الحد يجب أن يكون عددًا صحيحًا",
-      "number.min":
-        "Limit must be at least 1 splithere الحد يجب أن يكون 1 على الأقل",
-      "number.max":
-        "Limit must not exceed 100 splithere الحد يجب ألا يتجاوز 100",
-    }),
-
-  search: Joi.string().trim().max(50).allow("").optional().messages({
-    "string.base": "Search must be text splithere البحث يجب أن يكون نصًا",
-    "string.max":
-      "Search must not exceed 50 characters splithere البحث يجب ألا يتجاوز 50 حرفًا",
-  }),
-
-  role: Joi.string().valid("admin", "super").optional().messages({
-    "string.base": "Role must be text splithere الدور يجب أن يكون نصًا",
-    "any.only":
-      "Role must be 'admin' or 'super' splithere الدور يجب أن يكون 'admin' أو 'super'",
-  }),
-
-  isActive: Joi.boolean().optional().messages({
-    "boolean.base":
-      "Account status must be true or false splithere حالة الحساب يجب أن تكون true أو false",
-  }),
-
-  sortBy: Joi.string()
-    .valid("createdAt", "first_name", "last_name", "email")
-    .default("createdAt")
-    .optional()
-    .messages({
-      "any.only":
-        "Sort field must be one of: createdAt, first_name, last_name, email splithere حقل الترتيب يجب أن يكون أحد: createdAt, first_name, last_name, email",
-    }),
-
-  sortOrder: Joi.string()
-    .valid("asc", "desc")
-    .default("desc")
-    .optional()
-    .messages({
-      "any.only":
-        "Sort order must be 'asc' or 'desc' splithere اتجاه الترتيب يجب أن يكون 'asc' أو 'desc'",
-    }),
-}).strict();
+  page: Joi.number().integer().min(1).max(10000).default(1).optional(),
+  limit: Joi.number().integer().min(1).max(100).default(20).optional(),
+  search: Joi.string().trim().max(50).allow("").optional(),
+  role: Joi.string().valid("admin", "super").optional(),
+  isActive: Joi.boolean().optional(),
+  sortBy: Joi.string().valid().default("createdAt").optional(),
+  sortOrder: Joi.string().valid().default("desc").optional(),
+});
 
 export const GetOneValidation = Joi.object({
   target_id: objectIdSchema.required().messages({

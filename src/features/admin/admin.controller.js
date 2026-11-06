@@ -17,7 +17,6 @@ export const CreateAdmin = async (req, res, next) => {
       phone_number,
       email,
       password,
-      avatar,
     } = req.validated;
 
     const existing = await Admin.findOne({ email }).lean();
@@ -44,7 +43,10 @@ export const CreateAdmin = async (req, res, next) => {
       phone_number,
       gender,
       birth_date,
-      avatar,
+      avatar:
+        gender === "male"
+          ? process.env.DEFAULT_MALE_AVATAR
+          : process.env.DEFAULT_FEMALE_AVATAR,
       role: "admin",
       isActive: true,
       createdBy: req.admin._id,
