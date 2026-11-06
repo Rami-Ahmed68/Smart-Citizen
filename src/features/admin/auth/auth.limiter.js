@@ -1,3 +1,4 @@
+// src/features/admin/auth/auth.limiter.js
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 const buildHandler = (enMsg, arMsg) => (req, res) => {
@@ -16,7 +17,7 @@ export const LogInLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     const email = req.body?.email?.toLowerCase().trim() || "unknown";
-    return `${ipKeyGenerator(req.ip)}:${email}`;
+    return `email:${email}`;
   },
   handler: buildHandler(
     "Too many login attempts. Please try again in 15 minutes.",
@@ -26,14 +27,11 @@ export const LogInLimiter = rateLimit({
 
 export const RefreshTokenLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: process.env.NODE_ENV === "production" ? 30 : 100,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    const refreshToken = req.body?.old_refresh_token || "unknown";
-    const lastChars = refreshToken.slice(-16);
-    return `${ipKeyGenerator(req.ip)}:${lastChars}`;
-  },
+  skip: () => process.env.NODE_ENV !== "production",
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   handler: buildHandler(
     "Too many refresh attempts. Please try again in 15 minutes.",
     "عدد كبير من محاولات التجديد. يرجى المحاولة بعد 15 دقيقة.",

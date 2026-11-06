@@ -166,7 +166,7 @@ export const RefreshTokenMethod = async (req, res, next) => {
       );
     }
 
-    const admin = await Admin.findById(decoded._id);
+    const admin = await Admin.findById(decoded._id).select("-password");
 
     if (!admin) {
       await RefreshToken.deleteOne({ _id: storedToken._id });
@@ -206,6 +206,15 @@ export const RefreshTokenMethod = async (req, res, next) => {
 
     const access_token = generateToken(payload, "access");
     const new_refresh_token = generateToken(payload, "refresh");
+    const adminData = _.pick(admin.toObject(), [
+      "_id",
+      "first_name",
+      "last_name",
+      "email",
+      "avatar",
+      "role",
+      "permissions",
+    ]);
 
     const decodedNew = decodeToken(new_refresh_token);
     const new_expires_at = new Date(decodedNew.payload.exp * 1000);
@@ -231,6 +240,7 @@ export const RefreshTokenMethod = async (req, res, next) => {
       },
       data: {
         access_token,
+        admin: adminData,
       },
     });
   } catch (error) {
