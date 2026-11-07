@@ -452,8 +452,7 @@ export const UpdateMyDataValidation = Joi.object({
   .messages({
     "object.min":
       "At least one field must be provided to update splithere يجب توفير حقل واحد على الأقل للتحديث",
-  })
-  .strict();
+  });
 
 export default {
   CreateAdminValidation,

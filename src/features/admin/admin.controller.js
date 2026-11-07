@@ -98,12 +98,7 @@ export const GetAll = async (req, res, next) => {
     const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
 
     const [data, total] = await Promise.all([
-      Admin.find(filter)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-
-        .lean(),
+      Admin.find(filter).sort(sort).skip(skip).limit(limit).lean(),
       Admin.countDocuments(filter),
     ]);
 
@@ -354,7 +349,18 @@ export const ChangeAdminPassword = async (req, res, next) => {
       );
     }
 
-    const target_admin = await Admin.findById(target_id);
+    // 🔑 جلب كلمة مرور السوبر أدمن الحالي
+    const currentSuperAdmin = await Admin.findById(req.admin._id).select(
+      "+password",
+    );
+
+    if (!currentSuperAdmin) {
+      return next(
+        new ApiError({ en: "Admin not found", ar: "الأدمن غير موجود" }, 404),
+      );
+    }
+
+    const target_admin = await Admin.findById(target_id).select("+password");
 
     if (!target_admin) {
       return next(
@@ -370,7 +376,7 @@ export const ChangeAdminPassword = async (req, res, next) => {
 
     const isSuperPasswordCorrect = await comparePassword(
       superadmin_password,
-      req.admin.password,
+      currentSuperAdmin.password,
     );
 
     if (!isSuperPasswordCorrect) {
@@ -428,9 +434,18 @@ export const ChangeMyPassword = async (req, res, next) => {
     const { current_password, new_password, confirm_new_password } =
       req.validated;
 
+    // 🔑 جلب الأدمن مع كلمة المرور المشفّرة
+    const admin = await Admin.findById(req.admin._id).select("+password");
+
+    if (!admin) {
+      return next(
+        new ApiError({ en: "Admin not found", ar: "الأدمن غير موجود" }, 404),
+      );
+    }
+
     const isCurrentPasswordCorrect = await comparePassword(
       current_password,
-      req.admin.password,
+      admin.password,
     );
 
     if (!isCurrentPasswordCorrect) {
@@ -457,10 +472,7 @@ export const ChangeMyPassword = async (req, res, next) => {
       );
     }
 
-    const isSamePassword = await comparePassword(
-      new_password,
-      req.admin.password,
-    );
+    const isSamePassword = await comparePassword(new_password, admin.password);
 
     if (isSamePassword) {
       return next(
@@ -474,7 +486,6 @@ export const ChangeMyPassword = async (req, res, next) => {
       );
     }
 
-    const admin = await Admin.findById(req.admin._id);
     admin.password = await hashPassword(new_password);
     await admin.save();
 
