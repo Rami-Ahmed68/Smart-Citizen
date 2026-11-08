@@ -276,6 +276,7 @@ export const GetAll = async (req, res, next) => {
       location,
       gender,
       marital_status,
+      religion,
       original_nationality,
       citizenship_type,
       birth_date_from,
@@ -289,6 +290,7 @@ export const GetAll = async (req, res, next) => {
     if (location) filter.location = location;
     if (gender) filter.gender = gender;
     if (marital_status) filter.marital_status = marital_status;
+    if (religion) filter.religion = religion;
 
     if (original_nationality) {
       filter.original_nationality = original_nationality;

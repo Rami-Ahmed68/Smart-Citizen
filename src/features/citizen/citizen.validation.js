@@ -196,6 +196,12 @@ export const GetAllCitizensValidation = Joi.object({
     "string.base": "Gender must be text splithere الجنس يجب أن يكون نصًا",
   }),
 
+  religion: Joi.string().valid("Muslim", "Christian").optional().messages({
+    "string.base": "Religion must be text splithere الديانة يجب أن تكون نصًا",
+    "any.only":
+      "Religion must be 'Muslim' or 'Christian' splithere الديانة يجب أن تكون 'Muslim' أو 'Christian'",
+  }),
+
   marital_status: Joi.string()
     .valid("Single", "Married", "Divorced", "Widowed")
     .optional()
