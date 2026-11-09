@@ -7,7 +7,6 @@ import {
   createCitizenLimiter,
   getAllCitizensLimiter,
   getOneCitizenLimiter,
-  updateRelationsLimiter,
   updateCitizenLimiter,
   deleteCitizenLimiter,
 } from "./citizen.limiter.js";
@@ -15,7 +14,6 @@ import {
   CreateCitizenValidation,
   GetAllCitizensValidation,
   GetOneCitizenValidation,
-  UpdateRelationsValidation,
   UpdateCitizenValidation,
   DeleteCitizenValidation,
 } from "./citizen.validation.js";
@@ -23,7 +21,6 @@ import {
   CreateCitizen,
   GetAll,
   GetOne,
-  UpdateRelations,
   UpdateCitizen,
   DeleteCitizen,
 } from "./citizen.controller.js";
@@ -55,14 +52,6 @@ CitizenRouter.get(
   getOneCitizenLimiter,
   validate(GetOneCitizenValidation, "query"),
   GetOne,
-);
-
-CitizenRouter.put(
-  "/relations",
-  requirePermission("update"),
-  updateRelationsLimiter,
-  validate(UpdateRelationsValidation),
-  UpdateRelations,
 );
 
 CitizenRouter.put(

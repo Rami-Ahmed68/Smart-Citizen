@@ -28,7 +28,7 @@ export const createCitizenLimiter = rateLimit({
 
 export const getAllCitizensLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 60,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: buildKeyGenerator,
@@ -52,7 +52,7 @@ export const getOneCitizenLimiter = rateLimit({
 
 export const updateRelationsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: buildKeyGenerator,

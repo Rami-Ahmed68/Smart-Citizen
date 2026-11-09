@@ -1,12 +1,15 @@
 import Citizen from "./citizen.model.js";
+import Family from "../family/family.model.js";
 import { ApiError } from "../../utils/error/ApiError.js";
 import { analyzeCitizenPhoto } from "../../services/vision.service.js";
-import { isValidObjectId } from "../../utils/id/id.validations.js";
 import {
   deleteUploadedFile,
   toStoredPath,
   toDiskPath,
 } from "../../utils/upload/multer.upload.js";
+
+const MIN_PARENT_CHILD_AGE_GAP = 20;
+const MIN_MARRIAGE_AGE = 18;
 
 function parseBirthDateStart(str) {
   if (/^\d{4}$/.test(str)) {
@@ -34,12 +37,35 @@ function withCitizenshipType(citizen) {
   };
 }
 
+function yearsDiff(olderDate, youngerDate) {
+  const older = new Date(olderDate);
+  const younger = new Date(youngerDate);
+  let years = younger.getFullYear() - older.getFullYear();
+  const monthDiff = younger.getMonth() - older.getMonth();
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && younger.getDate() < older.getDate())
+  ) {
+    years--;
+  }
+  return years;
+}
+
 export const CreateCitizen = async (req, res, next) => {
   const photoStored = toStoredPath(req.file);
   const photoDiskPath = req.file?.path || null;
   let isSuccess = false;
 
   try {
+    if (!req.file) {
+      return next(
+        new ApiError(
+          { en: "Citizen photo is required", ar: "صورة المواطن مطلوبة" },
+          400,
+        ),
+      );
+    }
+
     const {
       first_name,
       last_name,
@@ -51,38 +77,15 @@ export const CreateCitizen = async (req, res, next) => {
       original_nationality,
       location,
       marital_status,
-      spouse_id,
     } = req.validated;
 
-    if (!req.file) {
-      return next(
-        new ApiError(
-          { en: "Citizen photo is required", ar: "صورة المواطن مطلوبة" },
-          400,
-        ),
-      );
-    }
-
-    if (marital_status === "Married" && !spouse_id) {
+    if (marital_status && marital_status !== "Single") {
       await deleteUploadedFile(photoDiskPath);
       return next(
         new ApiError(
           {
-            en: "Cannot set marital_status to 'Married' without a spouse_id",
-            ar: "لا يمكن ضبط الحالة الاجتماعية على 'Married' بدون معرف الزوج/الزوجة",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (spouse_id && marital_status !== "Married") {
-      await deleteUploadedFile(photoDiskPath);
-      return next(
-        new ApiError(
-          {
-            en: "marital_status must be 'Married' when spouse_id is provided",
-            ar: "يجب أن تكون الحالة الاجتماعية 'Married' عند توفير معرف الزوج/الزوجة",
+            en: "New citizens must be created with 'Single' marital status. Use the Family module to establish marriages.",
+            ar: "يجب إنشاء المواطن الجديد بحالة 'أعزب'. استخدم وحدة العائلة لتوثيق الزواج.",
           },
           400,
         ),
@@ -158,61 +161,6 @@ export const CreateCitizen = async (req, res, next) => {
       );
     }
 
-    if (spouse_id) {
-      if (!isValidObjectId(spouse_id)) {
-        await deleteUploadedFile(photoDiskPath);
-        return next(
-          new ApiError(
-            {
-              en: "Invalid spouse ID format",
-              ar: "صيغة معرف الزوج/الزوجة غير صالحة",
-            },
-            400,
-          ),
-        );
-      }
-
-      const spouse = await Citizen.findById(spouse_id)
-        .select("_id gender spouse_id marital_status")
-        .lean();
-
-      if (!spouse) {
-        await deleteUploadedFile(photoDiskPath);
-        return next(
-          new ApiError(
-            { en: "Spouse not found", ar: "الزوج/الزوجة غير موجود" },
-            404,
-          ),
-        );
-      }
-
-      if (spouse.gender === gender) {
-        await deleteUploadedFile(photoDiskPath);
-        return next(
-          new ApiError(
-            {
-              en: "Spouse must be of the opposite gender",
-              ar: "يجب أن يكون الزوج/الزوجة من الجنس المعاكس",
-            },
-            400,
-          ),
-        );
-      }
-
-      if (spouse.spouse_id) {
-        await deleteUploadedFile(photoDiskPath);
-        return next(
-          new ApiError(
-            {
-              en: "Spouse is already married to another citizen",
-              ar: "الزوج/الزوجة متزوج/ة من مواطن آخر بالفعل",
-            },
-            409,
-          ),
-        );
-      }
-    }
-
     const citizen = await Citizen.create({
       first_name,
       last_name,
@@ -224,23 +172,13 @@ export const CreateCitizen = async (req, res, next) => {
       religion,
       original_nationality,
       location,
-      marital_status,
-      spouse_id: spouse_id || null,
+      marital_status: "Single",
+      parents_family_id: null,
+      own_family_ids: [],
       added_by: req.admin._id,
     });
 
     isSuccess = true;
-
-    if (spouse_id) {
-      try {
-        await Citizen.updateOne(
-          { _id: spouse_id },
-          { $set: { spouse_id: citizen._id, marital_status: "Married" } },
-        );
-      } catch (linkError) {
-        console.error("🔴 Failed to link spouse:", linkError.message);
-      }
-    }
 
     return res.status(201).json({
       success: true,
@@ -367,594 +305,57 @@ export const GetAll = async (req, res, next) => {
   }
 };
 
-export const GetOne = async (req, res, next) => {
-  try {
-    const { target_id } = req.validated;
+  export const GetOne = async (req, res, next) => {
+    try {
+      const { target_id } = req.validated;
 
-    const citizen = await Citizen.findById(target_id)
-      .select("-__v")
-      .populate("father", "first_name last_name photo")
-      .populate("mother", "first_name last_name photo")
-      .populate("spouse_id", "first_name last_name photo")
-      .populate("children_ids", "first_name last_name photo birth_date gender")
-      .lean();
+      const familyPopulateOptions = [
+        {
+          path: "father",
+          select: "first_name last_name photo gender birth_date",
+        },
+        {
+          path: "mother",
+          select: "first_name last_name photo gender birth_date",
+        },
+        {
+          path: "children_ids",
+          select: "first_name last_name photo gender birth_date",
+        },
+      ];
 
-    if (!citizen) {
-      return next(
-        new ApiError({ en: "Citizen not found", ar: "المواطن غير موجود" }, 404),
-      );
-    }
-
-    return res.status(200).json({
-      success: true,
-      status: "success",
-      statusCode: 200,
-      message: {
-        en: "Citizen retrieved successfully",
-        ar: "تم جلب بيانات المواطن بنجاح",
-      },
-      data: withCitizenshipType(citizen),
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-export const UpdateRelations = async (req, res, next) => {
-  try {
-    const {
-      citizen_id,
-      father,
-      mother,
-      children_ids,
-      spouse_id,
-      marital_status,
-    } = req.validated;
-
-    const citizen = await Citizen.findById(citizen_id);
-    if (!citizen) {
-      return next(
-        new ApiError({ en: "Citizen not found", ar: "المواطن غير موجود" }, 404),
-      );
-    }
-
-    if (father && father === citizen_id) {
-      return next(
-        new ApiError(
-          {
-            en: "A citizen cannot be their own father",
-            ar: "لا يمكن أن يكون المواطن أبًا لنفسه",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (mother && mother === citizen_id) {
-      return next(
-        new ApiError(
-          {
-            en: "A citizen cannot be their own mother",
-            ar: "لا يمكن أن تكون المواطنة أمًا لنفسها",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (children_ids && children_ids.includes(citizen_id)) {
-      return next(
-        new ApiError(
-          {
-            en: "A citizen cannot be their own child",
-            ar: "لا يمكن أن يكون المواطن ابنًا لنفسه",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (spouse_id && spouse_id === citizen_id) {
-      return next(
-        new ApiError(
-          {
-            en: "A citizen cannot marry themselves",
-            ar: "لا يمكن للمواطن أن يتزوج نفسه",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (father !== undefined && father !== null) {
-      if (citizen.children_ids.map(String).includes(father)) {
-        return next(
-          new ApiError(
-            {
-              en: "Circular relation: father cannot be a child of this citizen",
-              ar: "علاقة دائرية: لا يمكن أن يكون الأب ابنًا لهذا المواطن",
-            },
-            400,
-          ),
-        );
-      }
-
-      const fatherDoc = await Citizen.findById(father);
-      if (!fatherDoc) {
-        return next(
-          new ApiError({ en: "Father not found", ar: "الأب غير موجود" }, 404),
-        );
-      }
-      if (fatherDoc.gender !== "male") {
-        return next(
-          new ApiError(
-            { en: "Father must be male", ar: "يجب أن يكون الأب ذكرًا" },
-            400,
-          ),
-        );
-      }
-      if (
-        fatherDoc.birth_date &&
-        new Date(fatherDoc.birth_date) >= new Date(citizen.birth_date)
-      ) {
-        return next(
-          new ApiError(
-            {
-              en: "Father must be older than the citizen",
-              ar: "يجب أن يكون الأب أكبر سنًا من المواطن",
-            },
-            400,
-          ),
-        );
-      }
-    }
-
-    if (mother !== undefined && mother !== null) {
-      if (citizen.children_ids.map(String).includes(mother)) {
-        return next(
-          new ApiError(
-            {
-              en: "Circular relation: mother cannot be a child of this citizen",
-              ar: "علاقة دائرية: لا يمكن أن تكون الأم ابنة لهذا المواطن",
-            },
-            400,
-          ),
-        );
-      }
-
-      const motherDoc = await Citizen.findById(mother);
-      if (!motherDoc) {
-        return next(
-          new ApiError({ en: "Mother not found", ar: "الأم غير موجودة" }, 404),
-        );
-      }
-      if (motherDoc.gender !== "female") {
-        return next(
-          new ApiError(
-            { en: "Mother must be female", ar: "يجب أن تكون الأم أنثى" },
-            400,
-          ),
-        );
-      }
-      if (
-        motherDoc.birth_date &&
-        new Date(motherDoc.birth_date) >= new Date(citizen.birth_date)
-      ) {
-        return next(
-          new ApiError(
-            {
-              en: "Mother must be older than the citizen",
-              ar: "يجب أن تكون الأم أكبر سنًا من المواطن",
-            },
-            400,
-          ),
-        );
-      }
-    }
-
-    if (children_ids !== undefined && children_ids.length > 0) {
-      const childrenDocs = await Citizen.find({
-        _id: { $in: children_ids },
-      })
-        .select("_id birth_date gender father mother")
+      const citizen = await Citizen.findById(target_id)
+        .select("-__v")
+        .populate({
+          path: "parents_family_id",
+          populate: familyPopulateOptions,
+        })
+        .populate({
+          path: "own_family_ids",
+          populate: familyPopulateOptions,
+        })
         .lean();
 
-      if (childrenDocs.length !== children_ids.length) {
+      if (!citizen) {
         return next(
-          new ApiError(
-            {
-              en: "One or more children were not found",
-              ar: "واحد أو أكثر من الأبناء غير موجود",
-            },
-            404,
-          ),
+          new ApiError({ en: "Citizen not found", ar: "المواطن غير موجود" }, 404),
         );
       }
 
-      for (const child of childrenDocs) {
-        if (new Date(child.birth_date) >= new Date(citizen.birth_date)) {
-          return next(
-            new ApiError(
-              {
-                en: `Child ${child._id} must be younger than the citizen`,
-                ar: `الابن ${child._id} يجب أن يكون أصغر سنًا من المواطن`,
-              },
-              400,
-            ),
-          );
-        }
-
-        if (
-          citizen.father?.toString() === child._id.toString() ||
-          citizen.mother?.toString() === child._id.toString()
-        ) {
-          return next(
-            new ApiError(
-              {
-                en: "Circular relation: child cannot be a parent of this citizen",
-                ar: "علاقة دائرية: لا يمكن أن يكون الابن أبًا/أمًا لهذا المواطن",
-              },
-              400,
-            ),
-          );
-        }
-      }
+      return res.status(200).json({
+        success: true,
+        status: "success",
+        statusCode: 200,
+        message: {
+          en: "Citizen retrieved successfully",
+          ar: "تم جلب بيانات المواطن بنجاح",
+        },
+        data: withCitizenshipType(citizen),
+      });
+    } catch (error) {
+      return next(error);
     }
-
-    if (spouse_id !== undefined && spouse_id !== null) {
-      if (
-        citizen.father?.toString() === spouse_id ||
-        citizen.mother?.toString() === spouse_id
-      ) {
-        return next(
-          new ApiError(
-            {
-              en: "A citizen cannot marry their parent",
-              ar: "لا يمكن للمواطن الزواج من أحد والديه",
-            },
-            400,
-          ),
-        );
-      }
-
-      if (citizen.children_ids.map(String).includes(spouse_id)) {
-        return next(
-          new ApiError(
-            {
-              en: "A citizen cannot marry their child",
-              ar: "لا يمكن للمواطن الزواج من أحد أبنائه",
-            },
-            400,
-          ),
-        );
-      }
-
-      const spouseDoc = await Citizen.findById(spouse_id)
-        .select("_id gender spouse_id father mother children_ids")
-        .lean();
-
-      if (!spouseDoc) {
-        return next(
-          new ApiError(
-            { en: "Spouse not found", ar: "الزوج/الزوجة غير موجود" },
-            404,
-          ),
-        );
-      }
-
-      if (spouseDoc.gender === citizen.gender) {
-        return next(
-          new ApiError(
-            {
-              en: "Spouse must be of the opposite gender",
-              ar: "يجب أن يكون الزوج/الزوجة من الجنس المعاكس",
-            },
-            400,
-          ),
-        );
-      }
-
-      if (
-        spouseDoc.spouse_id &&
-        spouseDoc.spouse_id.toString() !== citizen_id
-      ) {
-        return next(
-          new ApiError(
-            {
-              en: "Spouse is already married to someone else",
-              ar: "الزوج/الزوجة متزوج/ة من شخص آخر بالفعل",
-            },
-            409,
-          ),
-        );
-      }
-
-      if (
-        spouseDoc.father?.toString() === citizen_id ||
-        spouseDoc.mother?.toString() === citizen_id
-      ) {
-        return next(
-          new ApiError(
-            {
-              en: "Circular relation: citizen is the spouse's parent",
-              ar: "علاقة دائرية: لا يمكن أن يكون المواطن والد الزوج/الزوجة",
-            },
-            400,
-          ),
-        );
-      }
-
-      if (spouseDoc.children_ids?.map(String).includes(citizen_id)) {
-        return next(
-          new ApiError(
-            {
-              en: "Circular relation: citizen is the spouse's child",
-              ar: "علاقة دائرية: لا يمكن أن يكون المواطن ابن الزوج/الزوجة",
-            },
-            400,
-          ),
-        );
-      }
-    }
-
-    if (father === null && !citizen.father) {
-      return next(
-        new ApiError(
-          {
-            en: "This citizen has no father to remove",
-            ar: "هذا المواطن ليس لديه أب لإزالته",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (mother === null && !citizen.mother) {
-      return next(
-        new ApiError(
-          {
-            en: "This citizen has no mother to remove",
-            ar: "هذه المواطنة ليس لديها أم لإزالتها",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (
-      children_ids !== undefined &&
-      children_ids.length === 0 &&
-      citizen.children_ids.length === 0
-    ) {
-      return next(
-        new ApiError(
-          {
-            en: "This citizen has no children to remove",
-            ar: "هذا المواطن ليس لديه أبناء لإزالتهم",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (spouse_id === null && !citizen.spouse_id) {
-      return next(
-        new ApiError(
-          {
-            en: "This citizen has no spouse to remove",
-            ar: "هذا المواطن ليس لديه زوج/زوجة لإزالته",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (
-      marital_status === "Married" &&
-      spouse_id === undefined &&
-      !citizen.spouse_id
-    ) {
-      return next(
-        new ApiError(
-          {
-            en: "Cannot set marital_status to 'Married' without a spouse_id",
-            ar: "لا يمكن ضبط الحالة الاجتماعية على 'Married' بدون معرف الزوج/الزوجة",
-          },
-          400,
-        ),
-      );
-    }
-
-    if (
-      marital_status &&
-      ["Single", "Divorced", "Widowed"].includes(marital_status) &&
-      spouse_id === undefined &&
-      citizen.spouse_id
-    ) {
-      return next(
-        new ApiError(
-          {
-            en: `Cannot set marital_status to '${marital_status}' while still linked to a spouse. Use spouse_id: null first`,
-            ar: `لا يمكن ضبط الحالة الاجتماعية على '${marital_status}' مع وجود زوج/زوجة. استخدم spouse_id: null أولًا`,
-          },
-          400,
-        ),
-      );
-    }
-
-    if (citizen.father) {
-      const oldFatherDoc = await Citizen.findById(citizen.father)
-        .select("_id")
-        .lean();
-      if (!oldFatherDoc) {
-        console.warn(
-          `⚠️ Data integrity: citizen ${citizen._id} references non-existent father ${citizen.father}`,
-        );
-        citizen.father = null;
-      }
-    }
-
-    if (citizen.mother) {
-      const oldMotherDoc = await Citizen.findById(citizen.mother)
-        .select("_id")
-        .lean();
-      if (!oldMotherDoc) {
-        console.warn(
-          `⚠️ Data integrity: citizen ${citizen._id} references non-existent mother ${citizen.mother}`,
-        );
-        citizen.mother = null;
-      }
-    }
-
-    if (citizen.spouse_id) {
-      const oldSpouseDoc = await Citizen.findById(citizen.spouse_id)
-        .select("_id")
-        .lean();
-      if (!oldSpouseDoc) {
-        console.warn(
-          `⚠️ Data integrity: citizen ${citizen._id} references non-existent spouse ${citizen.spouse_id}`,
-        );
-        citizen.spouse_id = null;
-      }
-    }
-
-    const ops = [];
-
-    if (father !== undefined) {
-      const oldFather = citizen.father ? citizen.father.toString() : null;
-      const newFather = father ? father.toString() : null;
-
-      if (oldFather && oldFather !== newFather) {
-        ops.push(
-          Citizen.updateOne(
-            { _id: oldFather },
-            { $pull: { children_ids: citizen._id } },
-          ),
-        );
-      }
-
-      if (newFather && oldFather !== newFather) {
-        ops.push(
-          Citizen.updateOne(
-            { _id: newFather },
-            { $addToSet: { children_ids: citizen._id } },
-          ),
-        );
-      }
-
-      citizen.father = newFather ? newFather : null;
-    }
-
-    if (mother !== undefined) {
-      const oldMother = citizen.mother ? citizen.mother.toString() : null;
-      const newMother = mother ? mother.toString() : null;
-
-      if (oldMother && oldMother !== newMother) {
-        ops.push(
-          Citizen.updateOne(
-            { _id: oldMother },
-            { $pull: { children_ids: citizen._id } },
-          ),
-        );
-      }
-
-      if (newMother && oldMother !== newMother) {
-        ops.push(
-          Citizen.updateOne(
-            { _id: newMother },
-            { $addToSet: { children_ids: citizen._id } },
-          ),
-        );
-      }
-
-      citizen.mother = newMother ? newMother : null;
-    }
-
-    if (children_ids !== undefined) {
-      const oldChildren = citizen.children_ids.map(String);
-      const newChildren = children_ids.map(String);
-
-      const added = newChildren.filter((id) => !oldChildren.includes(id));
-      const removed = oldChildren.filter((id) => !newChildren.includes(id));
-
-      const parentField = citizen.gender === "male" ? "father" : "mother";
-
-      for (const childId of added) {
-        ops.push(
-          Citizen.updateOne(
-            { _id: childId },
-            { $set: { [parentField]: citizen._id } },
-          ),
-        );
-      }
-
-      for (const childId of removed) {
-        ops.push(
-          Citizen.updateOne(
-            { _id: childId, [parentField]: citizen._id },
-            { $set: { [parentField]: null } },
-          ),
-        );
-      }
-
-      citizen.children_ids = newChildren;
-    }
-
-    if (spouse_id !== undefined) {
-      const oldSpouse = citizen.spouse_id ? citizen.spouse_id.toString() : null;
-      const newSpouse = spouse_id ? spouse_id.toString() : null;
-
-      if (oldSpouse && oldSpouse !== newSpouse) {
-        const endStatus = marital_status || "Divorced";
-        ops.push(
-          Citizen.updateOne(
-            { _id: oldSpouse },
-            { $set: { spouse_id: null, marital_status: endStatus } },
-          ),
-        );
-      }
-
-      if (newSpouse) {
-        ops.push(
-          Citizen.updateOne(
-            { _id: newSpouse },
-            { $set: { spouse_id: citizen._id, marital_status: "Married" } },
-          ),
-        );
-        citizen.spouse_id = newSpouse;
-        citizen.marital_status = "Married";
-      } else {
-        citizen.spouse_id = null;
-        citizen.marital_status = marital_status || "Divorced";
-      }
-    } else if (marital_status !== undefined) {
-      citizen.marital_status = marital_status;
-    }
-
-    await Promise.all(ops);
-    await citizen.save();
-
-    return res.status(200).json({
-      success: true,
-      status: "success",
-      statusCode: 200,
-      message: {
-        en: "Citizen relations updated successfully",
-        ar: "تم تحديث علاقات المواطن بنجاح",
-      },
-      data: {
-        citizen_id: citizen._id,
-        father: citizen.father,
-        mother: citizen.mother,
-        children_ids: citizen.children_ids,
-        spouse_id: citizen.spouse_id,
-        marital_status: citizen.marital_status,
-      },
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
+  };
 
 export const UpdateCitizen = async (req, res, next) => {
   try {
@@ -966,6 +367,8 @@ export const UpdateCitizen = async (req, res, next) => {
       email,
       phone_number,
       original_nationality,
+      religion,
+      location,
     } = req.validated;
 
     const citizen = await Citizen.findById(target_id);
@@ -994,6 +397,14 @@ export const UpdateCitizen = async (req, res, next) => {
       original_nationality !== citizen.original_nationality
     ) {
       changes.original_nationality = original_nationality;
+    }
+
+    if (religion !== undefined && religion !== citizen.religion) {
+      changes.religion = religion;
+    }
+
+    if (location !== undefined && location !== citizen.location) {
+      changes.location = location;
     }
 
     if (birth_date !== undefined) {
@@ -1064,98 +475,134 @@ export const UpdateCitizen = async (req, res, next) => {
         newAge--;
       }
 
-      const hasChildren =
-        Array.isArray(citizen.children_ids) && citizen.children_ids.length > 0;
-      const hasSpouse = !!citizen.spouse_id;
+      const hasOwnFamilies =
+        Array.isArray(citizen.own_family_ids) &&
+        citizen.own_family_ids.length > 0;
+      const hasParentsFamily = !!citizen.parents_family_id;
 
-      if ((hasChildren || hasSpouse) && newAge < 18) {
+      if (hasOwnFamilies && newAge < MIN_MARRIAGE_AGE) {
         return next(
           new ApiError(
             {
-              en: "A citizen with children or a spouse must be at least 18 years old",
-              ar: "المواطن الذي لديه أبناء أو زوج/زوجة يجب أن يكون عمره 18 سنة على الأقل",
+              en: `A citizen with a family must be at least ${MIN_MARRIAGE_AGE} years old`,
+              ar: `المواطن الذي لديه عائلة يجب أن يكون عمره ${MIN_MARRIAGE_AGE} سنة على الأقل`,
             },
             400,
           ),
         );
       }
 
-      if (citizen.father) {
-        const father = await Citizen.findById(citizen.father)
-          .select("birth_date")
-          .lean();
-        if (father && new Date(father.birth_date) >= newBirthDate) {
-          return next(
-            new ApiError(
-              {
-                en: "Birth date cannot be earlier than or equal to the father's birth date",
-                ar: "تاريخ الميلاد لا يمكن أن يكون قبل أو يساوي تاريخ ميلاد الأب",
-              },
-              400,
-            ),
-          );
-        }
-      }
+      const familyIds = [];
+      if (hasParentsFamily) familyIds.push(citizen.parents_family_id);
+      if (hasOwnFamilies) familyIds.push(...citizen.own_family_ids);
 
-      if (citizen.mother) {
-        const mother = await Citizen.findById(citizen.mother)
-          .select("birth_date")
+      if (familyIds.length > 0) {
+        const families = await Family.find({ _id: { $in: familyIds } })
+          .select("father mother children_ids")
           .lean();
-        if (mother && new Date(mother.birth_date) >= newBirthDate) {
-          return next(
-            new ApiError(
-              {
-                en: "Birth date cannot be earlier than or equal to the mother's birth date",
-                ar: "تاريخ الميلاد لا يمكن أن يكون قبل أو يساوي تاريخ ميلاد الأم",
-              },
-              400,
-            ),
-          );
-        }
-      }
+        const familyMap = new Map(families.map((f) => [f._id.toString(), f]));
 
-      if (citizen.children_ids && citizen.children_ids.length > 0) {
-        const children = await Citizen.find({
-          _id: { $in: citizen.children_ids },
-        })
-          .select("birth_date _id")
-          .lean();
+        if (hasParentsFamily) {
+          const pf = familyMap.get(citizen.parents_family_id.toString());
+          if (pf) {
+            const parentIds = [];
+            if (pf.father) parentIds.push(pf.father);
+            if (pf.mother) parentIds.push(pf.mother);
 
-        for (const child of children) {
-          if (new Date(child.birth_date) <= newBirthDate) {
-            return next(
-              new ApiError(
-                {
-                  en: `Birth date cannot be later than or equal to child ${child._id}'s birth date`,
-                  ar: `تاريخ الميلاد لا يمكن أن يكون بعد أو يساوي تاريخ ميلاد الابن ${child._id}`,
-                },
-                400,
-              ),
-            );
+            if (parentIds.length > 0) {
+              const parents = await Citizen.find({ _id: { $in: parentIds } })
+                .select("birth_date _id")
+                .lean();
+
+              for (const p of parents) {
+                if (
+                  p.birth_date &&
+                  yearsDiff(p.birth_date, newBirthDate) <
+                    MIN_PARENT_CHILD_AGE_GAP
+                ) {
+                  return next(
+                    new ApiError(
+                      {
+                        en: `Parent ${p._id} must be at least ${MIN_PARENT_CHILD_AGE_GAP} years older than the citizen`,
+                        ar: `الوالد ${p._id} يجب أن يكون أكبر من المواطن بـ ${MIN_PARENT_CHILD_AGE_GAP} سنة على الأقل`,
+                      },
+                      400,
+                    ),
+                  );
+                }
+              }
+            }
           }
         }
-      }
 
-      if (citizen.spouse_id) {
-        const spouse = await Citizen.findById(citizen.spouse_id)
-          .select("birth_date")
-          .lean();
-        if (
-          spouse &&
-          Math.abs(
-            newBirthDate.getTime() - new Date(spouse.birth_date).getTime(),
-          ) >
-            100 * 365.25 * 24 * 60 * 60 * 1000
-        ) {
-          return next(
-            new ApiError(
-              {
-                en: "Age difference with spouse exceeds 100 years",
-                ar: "فرق العمر مع الزوج/الزوجة يتجاوز 100 سنة",
-              },
-              400,
-            ),
-          );
+        if (hasOwnFamilies) {
+          const childIds = new Set();
+          const spouseIds = new Set();
+
+          for (const fid of citizen.own_family_ids) {
+            const f = familyMap.get(fid.toString());
+            if (!f) continue;
+
+            for (const c of f.children_ids || []) childIds.add(String(c));
+
+            if (citizen.gender === "male" && f.mother)
+              spouseIds.add(String(f.mother));
+            if (citizen.gender === "female" && f.father)
+              spouseIds.add(String(f.father));
+          }
+
+          if (childIds.size > 0) {
+            const children = await Citizen.find({
+              _id: { $in: [...childIds] },
+            })
+              .select("birth_date _id")
+              .lean();
+
+            for (const c of children) {
+              if (
+                c.birth_date &&
+                yearsDiff(newBirthDate, c.birth_date) < MIN_PARENT_CHILD_AGE_GAP
+              ) {
+                return next(
+                  new ApiError(
+                    {
+                      en: `Child ${c._id} must be at least ${MIN_PARENT_CHILD_AGE_GAP} years younger than the citizen`,
+                      ar: `الابن ${c._id} يجب أن يكون أصغر من المواطن بـ ${MIN_PARENT_CHILD_AGE_GAP} سنة على الأقل`,
+                    },
+                    400,
+                  ),
+                );
+              }
+            }
+          }
+
+          if (spouseIds.size > 0) {
+            const spouses = await Citizen.find({
+              _id: { $in: [...spouseIds] },
+            })
+              .select("birth_date _id")
+              .lean();
+
+            for (const s of spouses) {
+              if (
+                s.birth_date &&
+                Math.abs(
+                  newBirthDate.getTime() - new Date(s.birth_date).getTime(),
+                ) >
+                  100 * 365.25 * 24 * 60 * 60 * 1000
+              ) {
+                return next(
+                  new ApiError(
+                    {
+                      en: "Age difference with spouse exceeds 100 years",
+                      ar: "فرق العمر مع الزوج/الزوجة يتجاوز 100 سنة",
+                    },
+                    400,
+                  ),
+                );
+              }
+            }
+          }
         }
       }
     }
@@ -1192,49 +639,45 @@ export const DeleteCitizen = async (req, res, next) => {
       );
     }
 
+    const familiesAsParent = await Family.find({
+      $or: [{ father: citizen._id }, { mother: citizen._id }],
+    })
+      .select("father mother")
+      .lean();
+
+    const formerSpouses = new Set();
+    for (const f of familiesAsParent) {
+      if (citizen.gender === "male" && f.mother)
+        formerSpouses.add(String(f.mother));
+      if (citizen.gender === "female" && f.father)
+        formerSpouses.add(String(f.father));
+    }
+
     const ops = [];
 
-    if (citizen.father) {
-      ops.push(
-        Citizen.updateOne(
-          { _id: citizen.father },
-          { $pull: { children_ids: citizen._id } },
-        ),
-      );
-    }
+    ops.push(
+      Family.updateMany({ father: citizen._id }, { $set: { father: null } }),
+    );
 
-    if (citizen.mother) {
-      ops.push(
-        Citizen.updateOne(
-          { _id: citizen.mother },
-          { $pull: { children_ids: citizen._id } },
-        ),
-      );
-    }
+    ops.push(
+      Family.updateMany({ mother: citizen._id }, { $set: { mother: null } }),
+    );
 
-    if (
-      Array.isArray(citizen.children_ids) &&
-      citizen.children_ids.length > 0
-    ) {
-      const parentField = citizen.gender === "male" ? "father" : "mother";
-      ops.push(
-        Citizen.updateMany(
-          { _id: { $in: citizen.children_ids }, [parentField]: citizen._id },
-          { $set: { [parentField]: null } },
-        ),
-      );
-    }
-
-    if (citizen.spouse_id) {
-      ops.push(
-        Citizen.updateOne(
-          { _id: citizen.spouse_id, spouse_id: citizen._id },
-          { $set: { spouse_id: null, marital_status: "Widowed" } },
-        ),
-      );
-    }
+    ops.push(
+      Family.updateMany(
+        { children_ids: citizen._id },
+        { $pull: { children_ids: citizen._id } },
+      ),
+    );
 
     await Promise.all(ops);
+
+    for (const spId of formerSpouses) {
+      await Citizen.updateOne(
+        { _id: spId },
+        { $set: { marital_status: "Widowed" } },
+      );
+    }
 
     if (citizen.photo) {
       await deleteUploadedFile(toDiskPath(citizen.photo));
@@ -1254,10 +697,11 @@ export const DeleteCitizen = async (req, res, next) => {
         deleted_id: citizen._id,
         full_name: `${citizen.first_name} ${citizen.last_name}`,
         unlinked: {
-          father: !!citizen.father,
-          mother: !!citizen.mother,
-          children_count: citizen.children_ids?.length || 0,
-          spouse: !!citizen.spouse_id,
+          was_child_in_family: !!citizen.parents_family_id,
+          own_families_count: Array.isArray(citizen.own_family_ids)
+            ? citizen.own_family_ids.length
+            : 0,
+          former_spouses_count: formerSpouses.size,
         },
       },
     });

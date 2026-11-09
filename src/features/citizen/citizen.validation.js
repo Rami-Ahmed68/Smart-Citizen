@@ -131,19 +131,6 @@ export const CreateCitizenValidation = Joi.object({
         "Location must be one of the 14 Syrian governorates splithere المحافظة يجب أن تكون إحدى المحافظات السورية الـ14",
       "any.required": "Location is required splithere المحافظة مطلوبة",
     }),
-
-  marital_status: Joi.string()
-    .valid("Single", "Married", "Divorced", "Widowed")
-    .default("Single")
-    .messages({
-      "any.only":
-        "Marital status must be Single, Married, Divorced, or Widowed splithere الحالة الاجتماعية يجب أن تكون Single أو Married أو Divorced أو Widowed",
-    }),
-
-  spouse_id: objectIdSchema.optional().allow(null).messages({
-    "any.invalid":
-      "Invalid spouse ID format splithere صيغة معرف الزوج/الزوجة غير صالحة",
-  }),
 });
 
 export const GetAllCitizensValidation = Joi.object({
@@ -283,53 +270,6 @@ export const GetOneCitizenValidation = Joi.object({
   }),
 });
 
-export const UpdateRelationsValidation = Joi.object({
-  citizen_id: objectIdSchema.required().messages({
-    "any.invalid":
-      "Invalid citizen ID format splithere صيغة معرف المواطن غير صالحة",
-    "any.required": "Citizen ID is required splithere معرف المواطن مطلوب",
-    "string.base":
-      "Citizen ID must be a string splithere معرف المواطن يجب أن يكون نصًا",
-  }),
-
-  father: objectIdSchema.optional().allow(null).messages({
-    "any.invalid":
-      "Invalid father ID format splithere صيغة معرف الأب غير صالحة",
-  }),
-
-  mother: objectIdSchema.optional().allow(null).messages({
-    "any.invalid":
-      "Invalid mother ID format splithere صيغة معرف الأم غير صالحة",
-  }),
-
-  children_ids: Joi.array().items(objectIdSchema).unique().optional().messages({
-    "array.base":
-      "children_ids must be an array splithere معرفات الأبناء يجب أن تكون مصفوفة",
-    "array.unique":
-      "children_ids must not contain duplicates splithere معرفات الأبناء لا يمكن أن تتكرر",
-    "any.invalid":
-      "Invalid child ID format splithere صيغة معرف أحد الأبناء غير صالحة",
-  }),
-
-  spouse_id: objectIdSchema.optional().allow(null).messages({
-    "any.invalid":
-      "Invalid spouse ID format splithere صيغة معرف الزوج/الزوجة غير صالحة",
-  }),
-
-  marital_status: Joi.string()
-    .valid("Single", "Married", "Divorced", "Widowed")
-    .optional()
-    .messages({
-      "any.only":
-        "Marital status must be Single, Married, Divorced, or Widowed splithere الحالة الاجتماعية يجب أن تكون Single أو Married أو Divorced أو Widowed",
-    }),
-})
-  .min(2)
-  .messages({
-    "object.min":
-      "At least one field (father, mother, children_ids, spouse_id, or marital_status) must be provided splithere يجب توفير حقل واحد على الأقل",
-  });
-
 export const UpdateCitizenValidation = Joi.object({
   target_id: objectIdSchema.required().messages({
     "any.invalid":
@@ -384,11 +324,53 @@ export const UpdateCitizenValidation = Joi.object({
       "string.pattern.base":
         "Phone number must be exactly 10 digits starting with 09 splithere رقم الهاتف يجب أن يكون 10 أرقام ويبدأ بـ 09",
     }),
+
+  original_nationality: Joi.string()
+    .trim()
+    .valid(...COUNTRIES)
+    .optional()
+    .messages({
+      "string.base":
+        "Original nationality must be text splithere الجنسية الأصلية يجب أن تكون نصًا",
+      "any.only":
+        "Original nationality must be a valid country name splithere الجنسية الأصلية يجب أن تكون اسم دولة صالحًا",
+    }),
+
+  religion: Joi.string().valid("Muslim", "Christian").optional().messages({
+    "string.base": "Religion must be text splithere الديانة يجب أن تكون نصًا",
+    "any.only":
+      "Religion must be 'Muslim' or 'Christian' splithere الديانة يجب أن تكون 'Muslim' أو 'Christian'",
+  }),
+
+  location: Joi.string()
+    .valid(
+      "Damascus",
+      "Rif Dimashq",
+      "Aleppo",
+      "Homs",
+      "Hama",
+      "Latakia",
+      "Tartus",
+      "Idlib",
+      "Deir ez-Zor",
+      "Raqqa",
+      "Al-Hasakah",
+      "Daraa",
+      "As-Suwayda",
+      "Quneitra",
+    )
+    .optional()
+    .messages({
+      "any.only":
+        "Location must be one of the 14 Syrian governorates splithere المحافظة يجب أن تكون إحدى المحافظات السورية الـ14",
+      "string.base":
+        "Location must be text splithere المحافظة يجب أن تكون نصًا",
+    }),
 })
   .min(2)
   .messages({
     "object.min":
-      "At least one field (first_name, last_name, birth_date, email, or phone_number) must be provided splithere يجب توفير حقل واحد على الأقل للتحديث",
+      "At least one field must be provided for update splithere يجب توفير حقل واحد على الأقل للتحديث",
   });
 
 export const DeleteCitizenValidation = Joi.object({

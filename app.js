@@ -12,6 +12,7 @@ import { seedSuperAdmin } from "./src/features/admin/admin.seeder.js";
 import AdminRouter from "./src/features/admin/admin.routes.js";
 import CitizenRouter from "./src/features/citizen/citizen.routes.js";
 import AdminAuthRouter from "./src/features/admin/auth/auth.routes.js";
+import FamilyRouter from "./src/features/family/family.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -79,6 +80,7 @@ app.use(
 app.use("/admin/auth", AdminAuthRouter);
 app.use("/admin", AdminRouter);
 app.use("/citizen", CitizenRouter);
+app.use("/family", FamilyRouter);
 
 app.use(notFound);
 app.use(Global);

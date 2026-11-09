@@ -35,27 +35,15 @@ const citizenSchema = new mongoose.Schema(
       enum: ["male", "female"],
     },
 
-    father: {
+    parents_family_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Citizen",
+      ref: "Family",
       default: null,
     },
 
-    mother: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Citizen",
-      default: null,
-    },
-
-    spouse_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Citizen",
-      default: null,
-    },
-
-    children_ids: {
+    own_family_ids: {
       type: [mongoose.Schema.Types.ObjectId],
-      ref: "Citizen",
+      ref: "Family",
       default: [],
     },
 
@@ -139,16 +127,8 @@ const citizenSchema = new mongoose.Schema(
   },
 );
 
-citizenSchema.virtual("citizenship_type").get(function () {
-  return this.original_nationality === "Syria" ? "by_birth" : "naturalized";
-});
-
-citizenSchema.set("toJSON", { virtuals: true });
-citizenSchema.set("toObject", { virtuals: true });
-
-citizenSchema.index({ father: 1 });
-citizenSchema.index({ mother: 1 });
-citizenSchema.index({ spouse_id: 1 });
+citizenSchema.index({ parents_family_id: 1 });
+citizenSchema.index({ own_family_ids: 1 });
 citizenSchema.index({ added_by: 1 });
 citizenSchema.index({ birth_date: 1 });
 citizenSchema.index({ location: 1, gender: 1 });
