@@ -29,6 +29,17 @@ export const getAllFamiliesLimiter = rateLimit({
   ),
 });
 
+export const getFamiliesByCitizenLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: jsonMessage(
+    "Too many citizen family lookups. Please try again later.",
+    "محاولات جلب عائلات المواطن كثيرة جدًا. يرجى المحاولة لاحقًا.",
+  ),
+});
+
 export const getOneFamilyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,

@@ -51,6 +51,13 @@ export const GetAllFamiliesValidation = Joi.object({
     "number.max": "Limit must not exceed 100 splithere الحد يجب ألا يتجاوز 100",
   }),
 
+  target_id: objectIdSchema.optional().messages({
+    "any.invalid":
+      "Invalid family ID format splithere صيغة معرف العائلة غير صالحة",
+    "string.base":
+      "Family ID must be a string splithere معرف العائلة يجب أن يكون نصًا",
+  }),
+
   citizen_id: objectIdSchema.optional().messages({
     "any.invalid":
       "Invalid citizen ID format splithere صيغة معرف المواطن غير صالحة",
@@ -114,6 +121,56 @@ export const GetAllFamiliesValidation = Joi.object({
     "object.with":
       "relation requires citizen_id splithere الحقل relation يتطلب وجود citizen_id",
   });
+
+export const GetFamiliesByCitizenValidation = Joi.object({
+  citizen_id: objectIdSchema.required().messages({
+    "any.invalid":
+      "Invalid citizen ID format splithere صيغة معرف المواطن غير صالحة",
+    "any.required": "Citizen ID is required splithere معرف المواطن مطلوب",
+    "string.base":
+      "Citizen ID must be a string splithere معرف المواطن يجب أن يكون نصًا",
+  }),
+
+  relation: Joi.string()
+    .valid("father", "mother", "child")
+    .optional()
+    .messages({
+      "any.only":
+        "Relation must be 'father', 'mother', or 'child' splithere الصفة يجب أن تكون 'father' أو 'mother' أو 'child'",
+      "string.base": "Relation must be text splithere الصفة يجب أن تكون نصًا",
+    }),
+
+  page: Joi.number().integer().min(1).max(10000).default(1).messages({
+    "number.base": "Page must be a number splithere الصفحة يجب أن تكون رقمًا",
+    "number.integer":
+      "Page must be an integer splithere الصفحة يجب أن تكون عددًا صحيحًا",
+    "number.min":
+      "Page must be at least 1 splithere الصفحة يجب أن تكون 1 على الأقل",
+    "number.max": "Page is too large splithere الصفحة كبيرة جدًا",
+  }),
+
+  limit: Joi.number().integer().min(1).max(100).default(20).messages({
+    "number.base": "Limit must be a number splithere الحد يجب أن يكون رقمًا",
+    "number.integer":
+      "Limit must be an integer splithere الحد يجب أن يكون عددًا صحيحًا",
+    "number.min":
+      "Limit must be at least 1 splithere الحد يجب أن يكون 1 على الأقل",
+    "number.max": "Limit must not exceed 100 splithere الحد يجب ألا يتجاوز 100",
+  }),
+
+  sortBy: Joi.string()
+    .valid("createdAt", "updatedAt")
+    .default("createdAt")
+    .messages({
+      "any.only":
+        "Sort field must be one of: createdAt, updatedAt splithere حقل الترتيب يجب أن يكون أحد: createdAt, updatedAt",
+    }),
+
+  sortOrder: Joi.string().valid("asc", "desc").default("desc").messages({
+    "any.only":
+      "Sort order must be 'asc' or 'desc' splithere اتجاه الترتيب يجب أن يكون 'asc' أو 'desc'",
+  }),
+});
 
 export const GetOneFamilyValidation = Joi.object({
   target_id: objectIdSchema.required().messages({

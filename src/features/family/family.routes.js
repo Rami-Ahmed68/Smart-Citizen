@@ -12,6 +12,7 @@ import {
 import {
   CreateFamilyValidation,
   GetAllFamiliesValidation,
+  GetFamiliesByCitizenValidation,
   GetOneFamilyValidation,
   UpdateFamilyValidation,
   DeleteFamilyValidation,
@@ -41,6 +42,14 @@ FamilyRouter.get(
   requirePermission("read"),
   getAllFamiliesLimiter,
   validate(GetAllFamiliesValidation, "query"),
+  GetAll,
+);
+
+FamilyRouter.get(
+  "/by-citizen",
+  requirePermission("read"),
+  getAllFamiliesLimiter,
+  validate(GetFamiliesByCitizenValidation, "query"),
   GetAll,
 );
 

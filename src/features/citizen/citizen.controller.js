@@ -112,8 +112,8 @@ export const CreateCitizen = async (req, res, next) => {
       return next(
         new ApiError(
           {
-            en: `The gender in the photo (${analysis.gender}) does not match the selected gender (${gender}).`,
-            ar: `الجنس في الصورة (${analysis.gender}) لا يطابق الجنس المحدد (${gender}).`,
+            en: "The gender in the photo does not match the selected gender in the request.",
+            ar: "الجنس في الصورة لا يطابق الجنس المحدد في الطلب.",
           },
           400,
         ),
@@ -211,6 +211,7 @@ export const GetAll = async (req, res, next) => {
     const {
       page = 1,
       limit = 20,
+      target_id,
       location,
       gender,
       marital_status,
@@ -225,6 +226,7 @@ export const GetAll = async (req, res, next) => {
 
     const filter = {};
 
+    if (target_id) filter._id = target_id;
     if (location) filter.location = location;
     if (gender) filter.gender = gender;
     if (marital_status) filter.marital_status = marital_status;
@@ -305,57 +307,56 @@ export const GetAll = async (req, res, next) => {
   }
 };
 
-  export const GetOne = async (req, res, next) => {
-    try {
-      const { target_id } = req.validated;
+export const GetOne = async (req, res, next) => {
+  try {
+    const { target_id } = req.validated;
 
-      const familyPopulateOptions = [
-        {
-          path: "father",
-          select: "first_name last_name photo gender birth_date",
-        },
-        {
-          path: "mother",
-          select: "first_name last_name photo gender birth_date",
-        },
-        {
-          path: "children_ids",
-          select: "first_name last_name photo gender birth_date",
-        },
-      ];
+    const familyPopulateOptions = [
+      {
+        path: "father",
+        select: "first_name last_name photo gender birth_date",
+      },
+      {
+        path: "mother",
+        select: "first_name last_name photo gender birth_date",
+      },
+      {
+        path: "children_ids",
+        select: "first_name last_name photo gender birth_date",
+      },
+    ];
 
-      const citizen = await Citizen.findById(target_id)
-        .select("-__v")
-        .populate({
-          path: "parents_family_id",
-          populate: familyPopulateOptions,
-        })
-        .populate({
-          path: "own_family_ids",
-          populate: familyPopulateOptions,
-        })
-        .lean();
+    const citizen = await Citizen.findById(target_id)
+      .populate({
+        path: "parents_family_id",
+        populate: familyPopulateOptions,
+      })
+      .populate({
+        path: "own_family_ids",
+        populate: familyPopulateOptions,
+      })
+      .lean();
 
-      if (!citizen) {
-        return next(
-          new ApiError({ en: "Citizen not found", ar: "المواطن غير موجود" }, 404),
-        );
-      }
-
-      return res.status(200).json({
-        success: true,
-        status: "success",
-        statusCode: 200,
-        message: {
-          en: "Citizen retrieved successfully",
-          ar: "تم جلب بيانات المواطن بنجاح",
-        },
-        data: withCitizenshipType(citizen),
-      });
-    } catch (error) {
-      return next(error);
+    if (!citizen) {
+      return next(
+        new ApiError({ en: "Citizen not found", ar: "المواطن غير موجود" }, 404),
+      );
     }
-  };
+
+    return res.status(200).json({
+      success: true,
+      status: "success",
+      statusCode: 200,
+      message: {
+        en: "Citizen retrieved successfully",
+        ar: "تم جلب بيانات المواطن بنجاح",
+      },
+      data: withCitizenshipType(citizen),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 export const UpdateCitizen = async (req, res, next) => {
   try {

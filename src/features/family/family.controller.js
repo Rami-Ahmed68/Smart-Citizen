@@ -177,6 +177,24 @@ async function ensureNoBloodRelation(fatherDoc, motherDoc) {
   return { ok: true };
 }
 
+async function ensureNoDuplicateParents(
+  fatherId,
+  motherId,
+  excludeFamilyId = null,
+) {
+  const filter = {
+    father: fatherId || null,
+    mother: motherId || null,
+  };
+
+  if (excludeFamilyId) {
+    filter._id = { $ne: excludeFamilyId };
+  }
+
+  const duplicate = await Family.findOne(filter).select("_id").lean();
+  return !!duplicate;
+}
+
 export const CreateFamily = async (req, res, next) => {
   try {
     const { father, mother, children_ids } = req.validated;
@@ -288,6 +306,19 @@ export const CreateFamily = async (req, res, next) => {
       if (bloodCheck.error) return next(bloodCheck.error);
     }
 
+    const isDuplicate = await ensureNoDuplicateParents(father, mother);
+    if (isDuplicate) {
+      return next(
+        new ApiError(
+          {
+            en: "A family with the same father and mother already exists. Each spouse pair can only have one family record.",
+            ar: "توجد عائلة بالفعل بنفس الأب والأم. لا يمكن أن يكون لكل زوجين أكثر من سجل عائلي واحد.",
+          },
+          409,
+        ),
+      );
+    }
+
     const {
       docs: childDocs,
       deduped,
@@ -373,6 +404,7 @@ export const GetAll = async (req, res, next) => {
     const {
       page = 1,
       limit = 20,
+      target_id,
       citizen_id,
       relation,
       father,
@@ -387,6 +419,7 @@ export const GetAll = async (req, res, next) => {
 
     const filter = {};
 
+    if (target_id) filter._id = target_id;
     if (added_by) filter.added_by = added_by;
 
     if (citizen_id) {
@@ -603,6 +636,25 @@ export const UpdateFamily = async (req, res, next) => {
           motherDocForBlood,
         );
         if (bloodCheck.error) return next(bloodCheck.error);
+      }
+    }
+
+    if (newFather !== oldFather || newMother !== oldMother) {
+      const isDuplicate = await ensureNoDuplicateParents(
+        newFather,
+        newMother,
+        family._id,
+      );
+      if (isDuplicate) {
+        return next(
+          new ApiError(
+            {
+              en: "Another family with the same father and mother already exists. Each spouse pair can only have one family record.",
+              ar: "توجد عائلة أخرى بنفس الأب والأم. لا يمكن أن يكون لكل زوجين أكثر من سجل عائلي واحد.",
+            },
+            409,
+          ),
+        );
       }
     }
 

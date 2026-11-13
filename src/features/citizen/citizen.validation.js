@@ -143,6 +143,13 @@ export const GetAllCitizensValidation = Joi.object({
     "number.max": "Page is too large splithere الصفحة كبيرة جدًا",
   }),
 
+  target_id: objectIdSchema.optional().messages({
+    "any.invalid":
+      "Invalid citizen ID format splithere صيغة معرف المواطن غير صالحة",
+    "string.base":
+      "Citizen ID must be a string splithere معرف المواطن يجب أن يكون نصًا",
+  }),
+
   limit: Joi.number().integer().min(1).max(100).default(20).messages({
     "number.base": "Limit must be a number splithere الحد يجب أن يكون رقمًا",
     "number.integer":
